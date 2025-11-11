@@ -2301,3 +2301,763 @@
 // повідомлення: "Student not found".
 
 // Таким чином ми винесли обробку помилок у єдине місце, зробили її більш правильною та зрозумілою для клієнта.
+
+// !  Заняття 5. Валідація
+// Вступ
+
+// Вітаємо!
+
+// У цьому модулі ми навчимося перевіряти правильність даних, які надходять у наш додаток в HTTP-запитах, а також працювати з великими обсягами даних у нашому застосунку. Це важливий етап, адже коли кількість записів зростає, нам потрібно їх захистити від помилок та зробити їх відображення зручним і зрозумілим для користувача.
+
+// Ми розглянемо ключові інструменти:
+
+// Валідація — перевірка правильності вхідних даних відповідно критеріїв.
+// Пагінація — поділ даних на сторінки, щоб зменшити навантаження та спростити навігацію.
+// Сортування — упорядкування даних за певними критеріями.
+// Фільтрація — вибір конкретних даних за заданими умовами.
+
+// Крок за кроком ми розберемо, як реалізувати кожен із цих інструментів у нашому бекенді.Це дозволить зробити застосунок більш ефективним, а роботу з даними — більш зручною для користувача.
+
+//!   Валідація
+// Навіщо потрібна валідація?
+
+// Коли ми працюємо з бекендом, дані приходять із зовнішнього світу (наприклад, із форм на сайті чи від сторонніх клієнтів). Вони можуть мати будь-який формат. Якщо ми не перевіримо їх:
+
+// у кращому випадку програма зламається;
+// у гіршому — це може відкрити шлях до вразливостей у безпеці.
+
+// Ми не можемо довіряти даним іззовні, тому перевіряємо їх на відповідність певним правилам:
+
+// правильний тип (число, рядок, булеве значення);
+// мінімальне та максимальне значення (для чисел);
+// мінімальна та максимальна довжина (для рядків);
+// відповідність одному зі списку значень;
+// обов’язкові або необов’язкові поля.
+
+// Цей процес і називається валідацією.
+
+// Чому це так важливо?
+
+// Перевірка даних, що надходять у запитах користувачів, має велике значення з кількох причин:
+
+// допомагає зменшити площину атаки;
+// захищає від атак на кшталт DDoS, cross-site scripting, command injection та SQL injection;
+// забезпечує узгодженість даних;
+// допомагає виявляти та фільтрувати шкідливі дані.
+
+// Цей тип перевірки називається валідацією на стороні сервера (server-side validation), і він є критично важливим під час розробки застосунків. На щастя, існує кілька бібліотек, які беруть цю задачу на себе.
+
+// Бібліотеки валідації
+
+// Дві найпопулярніші бібліотеки для цього:
+
+// Joi — мова опису схем об’єктів і валідатор.
+// celebrate — дозволяє інтегрувати Joi безпосередньо у маршрути Express.
+
+// Бібліотека celebrate вже містить Joi, тому достатньо встановити тільки її:
+
+// npm i celebrate
+//!   Схеми валідації
+// Схеми валідації
+
+// Joi — це бібліотека для валідації даних у Node.js. Вона дозволяє:
+
+// створювати схеми для об’єктів;
+// перевіряти об’єкти на відповідність цим схемам;
+// налаштовувати повідомлення про помилки.
+
+// Усі схеми ми зберігатимемо в окремій папці src/validations/. Для студентів це буде файл:
+
+// src/validations/studentsValidation.js
+
+// Базова схема валідації
+
+// Визначення схем (Schema definition): ви можете повністю описати схеми для об'єктів, які бажаєте валідувати. Для цього використовуються методи Joi.object() та Joi.array() для структур, а також методи для примітивів (числа, рядки, булеві значення тощо). Схеми є зрозумілими та читаються майже як звичайні правила.
+
+// Список усіх доступних правил є в офіційній документації.
+
+// Приклад схеми для перевірки тіла запиту під час створення нового студента:
+
+// import { Joi } from 'celebrate';
+
+// const bodySchema = Joi.object({
+//   name: Joi.string().min(3).max(30).required(),
+//   age: Joi.number().integer().min(12).max(65).required(),
+//   gender: Joi.string().valid('male', 'female', 'other').required(),
+//   avgMark: Joi.number().min(2).max(12).required(),
+//   onDuty: Joi.boolean(),
+// });
+
+// Тут ми описали правила для кожного поля. Наприклад, name має бути рядком довжиною від 3 до 30 символів і є обов’язковим.
+
+// Використання Segments
+
+// Далі потрібно визначити, яку саме частину HTTP-запиту ця схема має валідувати. Для цього ми експортуємо схему як об’єкт і через Segments вказуємо, що саме перевіряємо: body, params, query, headers чи cookies.
+
+// Ось так виглядає схема для валідації тіла запиту:
+
+// // src/validations/studentsValidation.js
+
+// import { Joi, Segments } from "celebrate";
+
+// export const createStudentSchema = {
+//   [Segments.BODY]: Joi.object({
+//     name: Joi.string().min(3).max(30).required(),
+//     age: Joi.number().integer().min(12).max(65).required(),
+//     gender: Joi.string().valid("male", "female", "other").required(),
+//     avgMark: Joi.number().min(2).max(12).required(),
+//     onDuty: Joi.boolean(),
+//   }),
+// };
+
+// Segments — це набір «ключів», які визначають, яку саме частину запиту потрібно перевіряти:
+
+// Segments.BODY → тіло запиту (req.body);
+// Segments.PARAMS → параметри маршруту (req.params);
+// Segments.QUERY → рядок запиту (req.query);
+// Segments.HEADERS → заголовки (req.headers);
+// Segments.COOKIES → кукі (req.cookies).
+
+// Ми передаємо ці значення як ключі в об’єкті запиту.
+
+// Наприклад, валідація параметра маршруту /notes/:category, де category — динамічний параметр:
+
+// {
+//   [Segments.PARAMS]: Joi.object({
+//     category: Joi.string().valid('work', 'study', 'personal').required(),
+//   })
+// }
+
+// У цьому випадку валідуються параметри маршруту, а саме :category.
+
+// Якщо зробити запит GET /notes/work або GET /notes/personal — він пройде валідацію.
+// Якщо ж зробити GET /notes/music — celebrate одразу поверне помилку 400 Bad Request, і контролер не виконається.
+
+// Кастомізація повідомлень про помилки
+
+// За замовчуванням повідомлення про помилки в Joi можуть бути незручними для користувачів: вони занадто технічні й складні для фронтенду.
+
+// Тому варто робити власні повідомлення, щоб у відповіді віддавати більш зрозумілу інформацію — що саме пішло не так із валідацією. Це полегшує обробку помилок на клієнті й покращує досвід як для розробників, так і для користувачів.
+
+// Ми можемо налаштовувати повідомлення через метод .messages():
+
+// // src/validations/studentsValidation.js
+
+// import { Joi, Segments } from 'celebrate';
+
+// export const createStudentSchema = {
+//   [Segments.BODY]: Joi.object({
+//     name: Joi.string().min(3).max(30).required().messages({
+//       "string.base": "Name must be a string",
+//       "string.min": "Name should have at least {#limit} characters",
+//       "string.max": "Name should have at most {#limit} characters",
+//       "any.required": "Name is required",
+//     }),
+//     age: Joi.number().integer().min(12).max(65).required().messages({
+//       "number.base": "Age must be a number",
+//       "number.min": "Age must be at least {#limit}",
+//       "number.max": "Age must be at most {#limit}",
+//       "any.required": "Age is required",
+//     }),
+//     gender: Joi.string().valid("male", "female", "other").required().messages({
+//       "any.only": "Gender must be one of: male, female, or other",
+//       "any.required": "Gender is required",
+//     }),
+//     avgMark: Joi.number().min(2).max(12).required().messages({
+//       "number.base": "Average mark must be a number",
+//       "number.min": "Average mark must be at least {#limit}",
+//       "number.max": "Average mark must be at most {#limit}",
+//       "any.required": "Average mark is required",
+//     }),
+//     onDuty: Joi.boolean().messages({
+//       "boolean.base": "onDuty must be a boolean value",
+//     }),
+//   }),
+// };
+
+// У цьому прикладі ми використовуємо метод .messages() для кожного правила в схемі, щоб задати власні повідомлення про помилки.
+
+// Правило string.base стосується .string().
+// Правило string.min стосується .min(), яке йде після .string().
+// І так далі.
+
+// Наприклад, якщо користувач надішле name як число, Joi поверне помилку з повідомленням:
+
+// "Name must be a string"
+
+// Таким чином, ми можемо гнучко налаштовувати повідомлення про помилки для кожного поля, роблячи їх більш зрозумілими та інформативними.
+
+// To the next block
+//!  Middleware валідації
+// Middleware валідації
+
+// celebrate — це middleware для Express, який обгортає Joi та спрощує валідацію в маршрутах. Він дозволяє перевіряти дані у різних частинах запиту: тіло (body), параметри (params), рядок запиту (query), заголовки (headers), кукі (cookies) тощо.
+
+// Ви описуєте схему валідації (Joi schema) і вказуєте, до якої частини запиту її застосувати.
+// celebrate виконує цю валідацію до контролера.
+// Якщо дані валідні — запит переходить далі у контролер.
+// Якщо ні — автоматично повертається помилка 400 Bad Request з поясненням, що саме не відповідає правилам.
+
+// Використання схеми у маршруті
+
+// Тепер підключимо схему у маршруті POST /students, щоб валідація виконувалась автоматично до контролера:
+
+// // src/routes/studentsRoutes.js
+
+// import { Router } from 'express';
+// import { celebrate, Segments } from 'celebrate';
+// import { createStudent } from '../controllers/studentsController.js';
+// import { createStudentSchema } from '../validations/studentsValidation.js';
+
+// const router = Router();
+
+// router.post('/students', celebrate(createStudentSchema), createStudent);
+
+// export default router;
+
+// У цьому прикладі celebrate перевіряє тіло запиту за схемою createStudentSchema. Якщо дані некоректні — клієнт одразу отримає 400 Bad Request. Якщо все гаразд — виконається контролер createStudent.
+
+// Як це працює
+
+// У Express маршрут може мати не лише контролер, а й кілька проміжних функцій (middleware). Вони виконуються у тому порядку, в якому ми їх вказали.
+
+// У прикладі вище:
+
+// router.post('/students', celebrate(createStudentSchema), createStudent);
+
+// Спочатку виконується celebrate. Він бере дані з req.body і перевіряє їх за схемою.
+// Якщо дані невалідні — повертається помилка 400 Bad Request, і контролер не запускається.
+// Якщо дані валідні — виконується наступна функція, тобто контролер createStudent.
+
+// Таким чином, додавання celebrate другим аргументом у маршруті гарантує, що контролер працює лише з перевіреними даними.
+
+// Middleware для обробки помилок
+
+// Ми вже бачили, що celebrate автоматично генерує помилки при невдалій валідації (наприклад, якщо studentId має неправильний формат). Але щоб ці помилки правильно відображалися у нашому додатку, потрібно підключити спеціальний middleware errors() від celebrate.
+
+// Де саме підключати?
+
+// Усі middleware виконуються у порядку, в якому вони оголошені.
+// Тому errors() має бути підключений до глобального errorHandler.
+// Це потрібно для того, щоб спочатку відловлювались помилки валідації celebrate, а вже потім — усі інші.
+
+// // src/server.js
+
+// import express from "express";
+// import "dotenv/config";
+// import cors from "cors";
+// // Імпортуємо middleware
+// import { errors } from "celebrate";
+// import { connectMongoDB } from "./db/connectMongoDB.js";
+// import { logger } from "./middleware/logger.js";
+// import { notFoundHandler } from "./middleware/notFoundHandler.js";
+// import { errorHandler } from "./middleware/errorHandler.js";
+// import studentsRoutes from "./routes/studentsRoutes.js";
+
+// const app = express();
+// const PORT = process.env.PORT ?? 3000;
+
+// app.use(logger);
+// app.use(express.json());
+// app.use(cors());
+
+// app.use(studentsRoutes);
+
+// // обробка 404
+// app.use(notFoundHandler);
+// // обробка помилок від celebrate (валідація)
+// app.use(errors());
+// // глобальна обробка інших помилок
+// app.use(errorHandler);
+
+// await connectMongoDB();
+
+// app.listen(PORT, () => {
+//   console.log(`Server is running on port ${PORT}`);
+// });
+
+// Якщо не підключити errors() від celebrate, то помилки валідації не будуть коректно оброблятися й ви отримаєте сирі Joi-помилки в консолі.
+
+// Правильний порядок підключення гарантує, що:
+
+// notFoundHandler ловить відсутні маршрути;
+// errors() перехоплює проблеми з валідацією;
+// errorHandler закриває все інше.
+
+// Протестуємо як працює поточний код:
+
+// To the next block
+//! Валідація ідентифікатора
+// Валідація ідентифікатора
+
+// У MongoDB кожен документ має унікальний ідентифікатор у полі _id. Це ObjectId, який має строго визначений формат:
+
+// завжди рядок у шістнадцятковому (hex) вигляді;
+// довжина — рівно 24 символи (12 байт у двійковому представленні);
+// автоматично генерується MongoDB при створенні документа.
+
+// Через це будь-який довільний рядок (навіть із 24 символів) не обов’язково буде валідним ObjectId. Якщо такий рядок передати у запит, MongoDB може повернути помилку або просто не знайти документ.
+
+// Щоб цього уникнути, ми додаємо валідацію ідентифікатора ще на рівні API. Це дозволяє:
+
+// відсіювати некоректні або шкідливі запити;
+// не передавати у базу "сміттєві" значення;
+// одразу повертати зрозумілу помилку клієнту.
+
+// Функція objectIdValidator
+
+// Створимо кастомний валідатор для Joi, який перевірятиме значення на валідність ObjectId.
+
+// // src/validations/studentsValidation.js
+
+// import { Joi, Segments } from 'celebrate';
+// import { isValidObjectId } from 'mongoose';
+
+// // Кастомний валідатор для ObjectId
+// const objectIdValidator = (value, helpers) => {
+//   return !isValidObjectId(value) ? helpers.message('Invalid id format') : value;
+// };
+
+// // Схема для перевірки параметра studentId
+// export const studentIdParamSchema = {
+//   [Segments.PARAMS]: Joi.object({
+//     studentId: Joi.string().custom(objectIdValidator).required(),
+//   }),
+// };
+
+// isValidObjectId(value) — це утиліта з Mongoose, яка перевіряє, чи рядок відповідає формату MongoDB ObjectId.
+// Якщо isValidObjectId повертає false, ми викликаємо helpers.message('Invalid id format'), щоб створити помилку в Joi.
+// Якщо все гаразд, функція просто повертає значення далі.
+
+// Таким чином, ми отримуємо зрозумілу помилку для клієнта замість технічної MongoDB-помилки.
+
+// Використання у маршрутах
+
+// Додамо схему у маршрут /students/:studentId, щоб celebrate автоматично перевіряв параметр studentId:
+
+// // src/routes/studentsRoutes.js
+
+// import { Router } from 'express';
+// import { celebrate } from 'celebrate';
+
+// import { getStudentById, deleteStudent } from '../controllers/studentsController.js';
+// import { studentIdParamSchema } from '../validations/studentsValidation.js';
+
+// const router = Router();
+
+// router.get('/students/:studentId', celebrate(studentIdParamSchema), getStudentById);
+// router.delete('/students/:studentId', celebrate(studentIdParamSchema), deleteStudent);
+
+// export default router;
+
+// Ми використовуємо одну й ту саму схему для обох маршрутів:
+
+// GET /students/:studentId — отримання студента за id;
+// DELETE /students/:studentId — видалення студента за id.
+
+// Це дозволяє уникнути дублювання коду й зберігати валідацію в одному місці.
+
+// Тепер:
+
+// Якщо id валідний → виконується контролер.
+// Якщо id невалідний → celebrate одразу повертає 400 Bad Request з повідомленням "Invalid id format".
+
+// Простестуємо як працює валідація ідентифікатора:
+
+//!  Валідація для PATCH
+// Валідація для PATCH
+
+// Тепер ми реалізуємо валідацію для маршруту PATCH /students/:studentId.
+
+// У цьому випадку потрібно перевіряти дві речі:
+
+// Ідентифікатор у параметрах маршруту. studentId має бути валідним ObjectId. Це дозволяє відсікти некоректні запити ще до звернення до бази.
+// Тіло запиту. Оскільки це PATCH, усі поля є необов’язковими, але хоча б одне повинно бути передано. Для цього у Joi використовується .min(1).
+
+// Створимо схему, яка перевірятиме одночасно і params, і body:
+
+// // src/validations/studentsValidation.js
+
+// import { Joi, Segments } from 'celebrate';
+// import { isValidObjectId } from 'mongoose';
+
+// // Кастомний валідатор для ObjectId
+// const objectIdValidator = (value, helpers) => {
+//   return !isValidObjectId(value) ? helpers.message('Invalid id format') : value;
+// };
+
+// export const updateStudentSchema = {
+//   [Segments.PARAMS]: Joi.object({
+//     studentId: Joi.string().custom(objectIdValidator).required(),
+//   }),
+//   [Segments.BODY]: Joi.object({
+//     name: Joi.string().min(3).max(30),
+//     age: Joi.number().integer().min(12).max(65),
+//     gender: Joi.string().valid('male', 'female', 'other'),
+//     avgMark: Joi.number().min(2).max(12),
+//     onDuty: Joi.boolean(),
+//   }).min(1), // важливо: не дозволяємо порожнє тіло
+// };
+
+// Тепер використаємо цю схему у маршруті PATCH /students/:studentId:
+
+// // src/routes/studentsRoutes.js
+
+// import { Router } from 'express';
+// import { celebrate } from 'celebrate';
+// import { updateStudent } from '../controllers/studentsController.js';
+// import { updateStudentSchema } from '../validations/studentsValidation.js';
+
+// const router = Router();
+
+// router.patch('/students/:studentId', celebrate(updateStudentSchema), updateStudent);
+
+// export default router;
+
+// Якщо studentId невалідний → повертається 400 Bad Request з повідомленням "Invalid id format".
+// Якщо тіло запиту порожнє → повертається 400 Bad Request з повідомленням від Joi.
+// Якщо дані валідні → виконується контролер updateStudent.
+
+// Протестуємо як працює валідація при оновленні інформації студента:
+
+// To the next block
+//!  Заняття 6. Пагінація та фільтрація
+// Пагінація — це метод організації великої кількості даних, при якому записи відображаються частинами ("сторінками"), а не всі одразу.
+
+// Замість того щоб завантажувати тисячі об’єктів за один запит, ми показуємо лише обмежену кількість записів, а користувач може переходити між сторінками.
+
+// Навіщо потрібна пагінація?
+
+// Полегшує навігацію: користувачеві простіше переглядати дані маленькими частинами.
+// Зменшує навантаження: сервер віддає лише потрібну частину результатів, а не всю колекцію.
+// Підвищує швидкість: на фронтенді працювати з 10–20 записами значно легше, ніж із кількома тисячами.
+
+// Основні параметри пагінації
+
+// При реалізації пагінації ми будемо працювати з такими властивостями:
+
+// perPage — скільки записів показувати на одній сторінці;
+// page — номер сторінки, яку хоче отримати користувач;
+// totalItems — загальна кількість записів у колекції;
+// totalPages — кількість сторінок, яка визначається як:
+
+// Math.ceil(totalItems / perPage)
+
+// Як це працює у запиті та відповіді
+
+// Клієнт відправляє параметри page та perPage у запиті до бекенду.
+// Бекенд повертає:
+// список записів для потрібної сторінки;
+// мета-інформацію: page, perPage, totalItems, totalPages.
+
+// Таким чином, користувач завжди знає, скільки ще даних є та як між ними переміщатися.
+//!  Створення пагінації
+// Створення пагінації
+
+// Додаємо пагінацію до маршруту отримання всіх студентів GET /students. Ми очікуємо, що клієнт може передати у рядку запиту параметри page та perPage.
+
+// /students?page=1&perPage=15
+
+// Це означає: "поверни мені першу сторінку з 15 студентів".
+
+// Валідація параметрів
+
+// Щоб запити були коректними, одразу додамо валідацію через Joi і celebrate. Для валідації параметрів рядка запиту описуємо схему в Segments.QUERY.
+
+// // src/validations/studentsValidation.js
+
+// import { Joi, Segments } from "celebrate";
+
+// export const getStudentsSchema = {
+//   [Segments.QUERY]: Joi.object({
+//     page: Joi.number().integer().min(1).default(1),
+//     perPage: Joi.number().integer().min(5).max(20).default(10),
+//   }),
+// };
+
+// Що тут відбувається:
+
+// page — має бути цілим числом, не менше ніж 1. Якщо клієнт не передав значення, воно автоматично дорівнює 1.
+// perPage — кількість студентів на сторінці. Має бути від 5 до 20. Якщо клієнт не вказав, за замовчуванням буде 10.
+// Обидва параметри необов’язкові: якщо їх немає в запиті, ми все одно отримаємо безпечні дефолтні значення.
+
+// Додаємо middleware валідації до маршруту:
+
+// // src/routes/studentsRoutes.js
+
+// import { getStudentsSchema } from "../validations/studentsValidation.js";
+
+// router.get("/students", celebrate(getStudentsSchema), getStudents);
+
+// Контролер із логікою пагінації
+
+// Тепер оновимо контролер getStudents, щоб він віддавав студентів частинами.
+
+// //src/controllers/studentsController.js
+
+// import { Student } from "../models/student.js";
+
+// export const getStudents = async (req, res) => {
+// 	// Отримуємо пара метри пагінації
+//   const { page = 1, perPage = 10 } = req.query;
+
+//   const skip = (page - 1) * perPage;
+
+//   // Створюємо базовий запит до колекції
+//   const studentsQuery = Student.find();
+
+//   // Виконуємо одразу два запити паралельно
+//   const [totalItems, students] = await Promise.all([
+//     studentsQuery.clone().countDocuments(),
+//     studentsQuery.skip(skip).limit(perPage),
+//   ]);
+
+// 	// Обчислюємо загальну кількість «сторінок»
+//   const totalPages = Math.ceil(totalItems / perPage);
+
+//   res.status(200).json({
+//     page,
+//     perPage,
+//     totalItems,
+//     totalPages,
+//     students,
+//   });
+// };
+
+// У відповіді ми віддаємо не тільки список студентів, але й корисну мета-інформацію:
+
+// на якій сторінці він зараз,
+// скільки студентів показано на сторінці,
+// скільки студентів є загалом,
+// скільки всього сторінок доступно.
+
+// Розбір коду крок за кроком
+
+// 1. Обчислюємо skip
+
+// const skip = (page - 1) * perPage;
+
+// Це визначає, скільки записів потрібно пропустити перед тим, як відібрати дані для поточної сторінки:
+
+// якщо page = 1 → пропускаємо 0 записів;
+// якщо page = 2 → пропускаємо perPage записів;
+// якщо page = 3 → пропускаємо 2 * perPage записів.
+// Таким чином ми зсуваємося на потрібну сторінку.
+
+// 2. Створюємо базовий запит
+
+// const studentsQuery = Student.find();
+
+// Тут ми ще не звертаємось до бази, а лише описуємо запит. Це дозволяє згодом «доповнювати» його іншими методами (skip, limit тощо).
+
+// 3. Виконуємо запити паралельно
+
+// const [totalItems, students] = await Promise.all([
+//   studentsQuery.clone().countDocuments(),
+//   studentsQuery.skip(skip).limit(perPage),
+// ]);
+
+// .countDocuments() — підраховує загальну кількість студентів у колекції.
+// .skip(skip).limit(perPage) — повертає тільки ту частину студентів, яка відповідає потрібній сторінці.
+
+// Ми запускаємо обидва запити одночасно за допомогою Promise.all. Це економить час, бо замість того, щоб чекати спочатку на один, а потім на інший — вони виконуються паралельно.
+
+// 4. Чому потрібен .clone()
+
+// У Mongoose один і той самий запит не можна виконати двічі. Тому перед повторним використанням його потрібно «клонувати». У нашому випадку це потрібно, щоб один раз отримати кількість документів, а другий — самі документи.
+
+// 5. Обчислюємо кількість сторінок
+
+// const totalPages = Math.ceil(totalItems / perPage);
+
+// Наприклад, якщо в колекції є 53 студенти, а на сторінку ми показуємо по 10, отримаємо:
+
+// Math.ceil(53 / 10) = 6
+
+// Тобто дані займають 6 сторінок.
+
+// Пропонуємо подивитися на пагінацію в дії:
+
+// To the next block
+
+//! Фільтрація
+// Фільтрація
+
+// Коли ми працюємо з великими наборами даних, важливо мати можливість отримувати не всі документи одразу, а лише ті, які відповідають певним умовам. Це і є фільтрація.
+
+// Фільтрація дозволяє:
+
+// обмежувати результати запитів;
+// працювати тільки з потрібними даними;
+// оптимізувати роботу сервера й бази даних.
+
+// Як клієнт передає фільтри
+
+// Найпоширеніший спосіб — через query parameters в URL.
+
+// https://example.com/students?minAge=12&maxAvgMark=10
+
+// символ ? відділяє шлях (/students) від параметрів;
+// параметри передаються у вигляді ключ=значення;
+// кілька параметрів розділяються знаком &.
+
+// У цьому прикладі:
+
+// minAge=12 означає, що мінімальний вік студента має бути 12 років;
+// maxAvgMark=10 означає, що середній бал не повинен перевищувати 10.
+
+// Фільтрацію варто виконувати саме на рівні бази даних, тобто на бекенді, а не після отримання всіх даних на фронтенді . Це швидше та ефективніше.
+
+// Фільтрація в MongoDB
+
+// У MongoDB ми можемо накладати умови за допомогою спеціальних операторів.
+
+// Приклад: знайти студентів, у яких середній бал від 10 і вище:
+
+// db.students.find({ avgMark: { $gte: 10 } });
+
+// Тут $gte означає greater than or equal (більше або дорівнює).
+
+// Основні оператори в Mongoose
+
+// У Mongoose ці оператори працюють так само. Ось кілька прикладів:
+
+// 1. Рівність ($eq)
+
+// Student.find({ age: { $eq: 9 } });
+
+// Знаходимо студентів з віком 9.
+
+// 2. Нерівність ($ne)
+
+// Student.find({ avgMark: { $ne: 10 } });
+
+// Знаходимо студентів, у яких середній бал не дорівнює 10.
+
+// 3. Більше ($gt), Більше або дорівнює ($gte)
+
+// Student.find({ age: { $gt: 8 } });
+
+// Знаходимо студентів з віком більше 8.
+
+// 4. Менше ($lt), Менше або дорівнює ($lte)
+
+// Student.find({ avgMark: { $lte: 8.5 } });
+
+// Знаходимо студентів із середнім балом не вищим за 8.5.
+
+// 5. У межах списку ($in)
+
+// Student.find({ gender: { $in: ['male', 'female'] } });
+
+// Знаходимо студентів чоловічої або жіночої статі.
+
+// 6. Не у списку ($nin)
+
+// Student.find({ gender: { $nin: ['male'] } });
+
+// Знаходимо всіх студентів, крім чоловіків.
+
+// Query Builder у Mongoose
+
+// У Mongoose є зручний механізм побудови складних запитів — Query Builder. Він дозволяє будувати умови покроково, додаючи фільтри «ланцюжком».
+
+// Приклад:
+
+// await Student.find()
+//   .where('age').gte(6).lte(10)   // вік від 6 до 10 включно
+//   .where('avgMark').gt(7)        // середній бал більше 7
+//   .exec();
+
+// Що тут відбувається:
+
+// .where('age').gte(6).lte(10) → додаємо умову для віку;
+// .where('avgMark').gt(7) → додаємо умову для середнього балу;
+// .exec() → виконує зібраний запит.
+
+// Таким чином, ми отримаємо студентів, яким від 6 до 10 років, і які мають середній бал вище 7.
+
+// Завдяки фільтрації ми можемо швидко працювати навіть із великими колекціями, отримуючи лише ті дані, які нам потрібні.
+
+// To the next block
+
+//! Створення фільтрів
+// Створення фільтрів
+
+// Додамо можливість фільтрувати колекцію студентів за статтю (gender) та мінімальним значенням середнього балу (minAvgMark).
+
+// Приклад запиту з усіма параметрами:
+
+// /students?page=1&perPage=15&gender=female&minAvgMark=2
+
+// Схема валідації
+
+// Спочатку оновимо схему, щоб перевіряти всі можливі query-параметри у маршруті GET /students.
+
+// // src/validations/studentsValidation.js
+
+// import { Joi, Segments } from "celebrate";
+
+// export const getStudentsSchema = {
+//   [Segments.QUERY]: Joi.object({
+//     page: Joi.number().integer().min(1).default(1),
+//     perPage: Joi.number().integer().min(5).max(20).default(10),
+//     gender: Joi.string().valid("male", "female", "other"),
+//     minAvgMark: Joi.number().positive()
+//   })
+// };
+
+// page і perPage — як і раніше, для пагінації;
+// gender — дозволені значення "male", "female", "other";
+// minAvgMark — число більше нуля, для вибору студентів із середнім балом вище заданого.
+
+// Контролер
+
+// Тепер у контролері будуємо запит динамічно, враховуючи, які параметри передав користувач.
+
+// Модифікуємо код контролера:
+
+// // src/controllers/studentsController.js
+
+// export const getStudents = async (req, res) => {
+//   const { page = 1, perPage = 10, gender, minAvgMark } = req.query;
+//   const skip = (page - 1) * perPage;
+
+//   const studentsQuery = Student.find();
+
+//   // Будуємо фільтр
+//   if (gender) {
+//     studentsQuery.where("gender").equals(gender);
+//   }
+//   if (minAvgMark) {
+//     studentsQuery.where("avgMark").gte(minAvgMark);
+//   }
+
+//   const [totalItems, students] = await Promise.all([
+//     studentsQuery.clone().countDocuments(),
+//     studentsQuery.skip(skip).limit(perPage),
+//   ]);
+
+//   const totalPages = Math.ceil(totalItems / perPage);
+
+//   res.status(200).json({
+//     page,
+//     perPage,
+//     totalItems,
+//     totalPages,
+//     students,
+//   });
+// };
+
+// Що тут відбувається?
+
+// studentsQuery.where("gender").equals(gender) — додає умову для фільтрації за статтю, якщо параметр переданий.
+// studentsQuery.where("avgMark").gte(minAvgMark) — додає умову для фільтрації за середнім балом (беремо тільки тих, у кого avgMark ≥ minAvgMark).
+// Promise.all([...]) — запускаємо підрахунок (countDocuments) і отримання списку студентів одночасно, щоб не робити два послідовних запити.
+// .clone() — потрібен у Mongoose, щоб один і той самий запит можна було виконати двічі (для підрахунку і для вибірки).
+
+// У результаті ми отримуємо список студентів із врахуванням пагінації та фільтрів, а також додаткову інформацію: скільки всього студентів (totalItems) і скільки сторінок (totalPages).
+
+// Давайте тепер подивимось на пагінацію, фільтра та сортування разом:
+
+// To the next block
